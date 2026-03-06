@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goldilocks — Sailing Conditions Finder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛵</text></svg>">
+
+<!-- Mapbox GL JS + Geocoder — same versions as dashboard -->
+<link href='https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css' rel='stylesheet'>
+<script src='https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js'></script>
+<link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.css'>
+<script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.min.js'></script>
+
+<style>
+/* ── CSS VARIABLES — matches dashboard exactly ── */
+:root {
+  --navy:#0a1628; --navy2:#112240; --navy3:#1a3460;
+  --gold:#c9a227; --gold2:#f0c040;
+  --teal:#00b4d8; --teal2:#0077a8;
+  --green:#2ecc71; --red:#e74c3c; --orange:#f39c12; --purple:#9b59b6;
+  --text:#e8edf5; --muted:#8899bb;
+  --card:#112240; --card2:#162b4d; --border:#1e3a6e;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--navy);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+/* ── HEADER ── */
+header{
+  background:linear-gradient(135deg,var(--navy2),var(--navy3));
+  border-bottom:2px solid var(--gold);
+  padding:14px 28px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  position:sticky;top:0;z-index:200;box-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+.hdr-left{display:flex;align-items:center;gap:14px;}
+.hdr-logo{font-size:2rem;line-height:1;}
+.hdr-name{font-size:1.2rem;font-weight:800;letter-spacing:.06em;color:var(--gold);text-transform:uppercase;}
+.hdr-sub{font-size:.7rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-top:2px;}
+.hdr-badge{
+  text-align:center;background:rgba(201,162,39,.1);
+  border:1px solid var(--gold);border-radius:12px;padding:8px 16px;
+}
+.badge-lbl{font-size:.6rem;color:var(--gold);letter-spacing:.15em;text-transform:uppercase;margin-bottom:3px;}
+.badge-val{font-size:.88rem;font-weight:800;color:var(--gold2);}
+
+/* ── MAIN ── */
+.main{max-width:1200px;margin:0 auto;padding:22px 20px 70px;}
+
+/* ── SECTION TITLE — matches dashboard ── */
+.section-title{
+  font-size:.7rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── CARD — matches dashboard ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;
+  transition:box-shadow .2s;margin-bottom:20px;}
+.card:hover{box-shadow:0 4px 20px rgba(0,0,0,.25);}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.card-header h3{font-size:.92rem;font-weight:700;}
+.card-icon{font-size:1.2rem;}
+
+/* ── TOKEN BANNER ── */
+.token-banner{
+  background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.3);
+  border-radius:12px;padding:14px 18px;margin-bottom:20px;
+  display:flex;align-items:center;flex-wrap:wrap;gap:12px;
+}
+.token-banner p{font-size:.84rem;color:var(--muted);flex:1;min-width:200px;line-height:1.5;}
+.token-banner p strong{color:var(--gold2);}
+.token-input-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.token-input{
+  padding:8px 12px;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-size:.84rem;width:280px;max-width:100%;
+}
+.token-input::placeholder{color:var(--muted);}
+.token-input:focus{outline:none;border-color:var(--gold);}
+.token-save-btn{
+  padding:8px 16px;background:var(--gold);color:var(--navy);
+  border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;
+  transition:background .2s;white-space:nowrap;
+}
+.token-save-btn:hover{background:var(--gold2);}
+.token-link{font-size:.75rem;color:var(--teal);}
+.token-link a{color:var(--teal);text-decoration:none;}
+.token-link a:hover{text-decoration:underline;}
+
+/* ── VOICE BUTTON ── */
+.vbtn{
+  padding:8px 18px;border:1.5px solid var(--teal);border-radius:10px;
+  background:transparent;color:var(--teal);font-size:.8rem;font-weight:700;
+  cursor:pointer;transition:all .2s;min-height:38px;white-space:nowrap;
+}
+.vbtn:hover,.vbtn.on{background:var(--teal);color:var(--navy);}
+
+/* ── PREF GRID ── */
+.pref-row{
+  display:flex;align-items:center;flex-wrap:wrap;gap:10px;
+  margin-bottom:14px;
+}
+.pref-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+@media(max-width:900px){.pref-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:500px){.pref-grid{grid-template-columns:1fr 1fr;}}
+.pitem label{
+  display:block;font-size:.67rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;
+}
+.pitem input,.pitem select{
+  width:100%;padding:8px 11px;background:var(--card2);
+  border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;
+  outline:none;transition:border .15s;
+}
+.pitem input:focus,.pitem select:focus{border-color:var(--teal);}
+.pitem select option{background:var(--navy2);}
+.tol-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.tol-row label{font-size:.72rem;color:var(--muted);white-space:nowrap;}
+.tol-row input[type=range]{flex:1;accent-color:var(--teal);}
+.tol-val{font-size:.82rem;color:var(--teal);font-weight:700;min-width:40px;}
+.vtranscript{font-size:.82rem;color:var(--gold2);font-style:italic;margin-bottom:8px;min-height:18px;}
+.vstatus{font-size:.78rem;color:var(--muted);}
+
+/* ── INFO BOX — matches dashboard .info-box ── */
+.info-box{
+  background:rgba(0,180,216,.07);border:1px solid rgba(0,180,216,.18);
+  border-radius:10px;padding:10px 14px;font-size:.83rem;color:var(--muted);
+  line-height:1.55;margin-top:0;
+}
+.info-box span{color:var(--teal);font-weight:600;}
+
+/* ── MAP SEARCH BAR — matches dashboard weather-search ── */
+.map-search-bar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;
+}
+#geocoderMount{flex:1;min-width:0;}
+#geocoderFallback{display:flex;gap:10px;width:100%;}
+.weather-input{
+  flex:1;padding:9px 14px;background:var(--card2);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:.9rem;outline:none;transition:border .15s;
+}
+.weather-input:focus{border-color:var(--teal);}
+.weather-input::placeholder{color:var(--muted);}
+.search-btn{
+  padding:9px 18px;background:var(--teal2);color:#fff;border:none;
+  border-radius:10px;font-size:.84rem;font-weight:700;cursor:pointer;
+  transition:background .2s;white-space:nowrap;min-height:40px;
+}
+.search-btn:hover{background:var(--teal);}
+.map-hint{font-size:.75rem;color:var(--muted);margin-bottom:8px;opacity:.8;}
+
+/* ── MAP CONTAINER — matches dashboard #sailMap ── */
+#glMap{
+  width:100%;height:400px;border-radius:14px;
+  overflow:hidden;border:1px solid var(--border);
+  position:relative;cursor:crosshair;
+}
+
+/* ── MAP PLACEHOLDER ── */
+#mapPlaceholder{
+  display:flex;align-items:center;justify-content:center;
+  height:100%;flex-direction:column;gap:12px;
+  background:var(--card2);border-radius:14px;padding:40px;text-align:center;
+}
+
+/* ── PIN BUTTONS — matches dashboard ── */
+.map-pin-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+
+/* ── VERDICT BADGE ── */
+.verdict{
+  font-size:1.1rem;font-weight:800;text-align:center;
+  padding:14px;border-radius:12px;margin-bottom:16px;letter-spacing:-.02em;
+}
+.v-perfect {background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.35);}
+.v-marginal{background:rgba(240,192,64,.15);color:var(--gold2);border:1px solid rgba(240,192,64,.35);}
+.v-close   {background:rgba(243,156,18,.15);color:var(--orange);border:1px solid rgba(243,156,18,.35);}
+.v-nope    {background:rgba(231,76,60,.15); color:var(--red);   border:1px solid rgba(231,76,60,.35);}
+
+/* ── WIND STAT CARDS — uses .stat-card from dashboard ── */
+.wstats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.wstat{
+  background:var(--card2);border:1px solid var(--border);border-radius:12px;
+  padding:14px 10px;text-align:center;position:relative;overflow:hidden;
+  transition:transform .2s,box-shadow .2s;
+}
+.wstat:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3);}
+.wstat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.wstat.ok::before{background:linear-gradient(90deg,#1a8a4a,var(--green));}
+.wstat.warn::before{background:linear-gradient(90deg,#c0700a,var(--orange));}
+.wstat.bad::before{background:linear-gradient(90deg,#8a1a1a,var(--red));}
+.wstat-lbl{font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+.wstat-arrow{font-size:1.3rem;display:inline-block;transition:transform .5s;margin-bottom:2px;}
+.wstat-val{font-size:1.4rem;font-weight:800;line-height:1.2;margin-bottom:4px;}
+.wstat-chk{font-size:.8rem;color:var(--muted);}
+.loc-name{text-align:center;font-size:.78rem;color:var(--muted);margin-top:4px;}
+
+/* ── HOURLY BARS ── */
+.hourly-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.hourly-lbl{font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.hourly-bars{display:flex;gap:3px;align-items:flex-end;height:48px;}
+.hbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:2px;}
+.hbar{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:background .3s;}
+.hbar-lbl{font-size:.58rem;color:var(--muted);white-space:nowrap;}
+
+/* ── SHARE BUTTON ── */
+.share-btn{
+  display:block;width:100%;padding:10px;margin-top:14px;
+  background:transparent;border:1px solid var(--border);
+  border-radius:10px;color:var(--muted);font-size:.82rem;cursor:pointer;transition:all .2s;
+}
+.share-btn:hover{border-color:var(--gold);color:var(--gold2);}
+
+/* ── STEPS ── */
+.steps{display:flex;gap:10px;margin-bottom:20px;overflow-x:auto;padding-bottom:2px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.steps::-webkit-scrollbar{display:none;}
+.step{
+  flex:1;min-width:130px;background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;
+}
+.snum{
+  width:26px;height:26px;border-radius:50%;background:var(--gold);color:var(--navy);
+  font-weight:900;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.stxt{font-size:.79rem;color:var(--muted);line-height:1.4;}
+
+/* ── RESULTS PANEL ── */
+#resultsPanel{display:none;}
+
+/* ── FOOTER ── */
+footer{
+  text-align:center;padding:24px 16px;font-size:.76rem;color:var(--muted);line-height:1.9;
+  border-top:1px solid var(--border);margin-top:20px;
+}
+footer a{color:var(--teal);text-decoration:none;}
+footer a:hover{text-decoration:underline;}
+
+/* ── MAPBOX GEOCODER DARK OVERRIDES — identical to dashboard ── */
+.mapboxgl-ctrl-geocoder{
+  background:var(--card2)!important;border:1px solid var(--border)!important;
+  border-radius:10px!important;box-shadow:none!important;
+  width:100%!important;max-width:100%!important;
+  font-family:'Segoe UI',system-ui,sans-serif!important;
+}
+.mapboxgl-ctrl-geocoder input{color:var(--text)!important;background:transparent!important;font-size:.9rem!important;}
+.mapboxgl-ctrl-geocoder input::placeholder{color:var(--muted)!important;}
+.mapboxgl-ctrl-geocoder--icon{fill:var(--muted)!important;}
+.mapboxgl-ctrl-geocoder--button{background:transparent!important;}
+.mapboxgl-ctrl-geocoder--button:hover{background:rgba(255,255,255,.05)!important;}
+.mapboxgl-ctrl-geocoder .suggestions{
+  background:var(--card2)!important;border:1px solid var(--border)!important;
+  border-radius:10px!important;box-shadow:0 8px 24px rgba(0,0,0,.5)!important;margin-top:4px!important;
+}
+.mapboxgl-ctrl-geocoder .suggestions>li>a{color:var(--text)!important;padding:9px 14px!important;}
+.mapboxgl-ctrl-geocoder .suggestions>li:hover>a,
+.mapboxgl-ctrl-geocoder .suggestions>.active>a{background:var(--navy3)!important;color:var(--gold2)!important;}
+.mapboxgl-ctrl-geocoder .suggestions>.active>a .geocoder-pin-right *,
+.mapboxgl-ctrl-geocoder .suggestions>li>a .geocoder-item-description{color:var(--muted)!important;font-size:.75rem!important;}
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--pin-right>*{display:none!important;}
+
+/* ── MAPBOX CONTROL OVERRIDES ── */
+.mapboxgl-ctrl-group{background:var(--card2)!important;border:1px solid var(--border)!important;border-radius:8px!important;}
+.mapboxgl-ctrl button.mapboxgl-ctrl-zoom-in .mapboxgl-ctrl-icon,
+.mapboxgl-ctrl button.mapboxgl-ctrl-zoom-out .mapboxgl-ctrl-icon,
+.mapboxgl-ctrl button.mapboxgl-ctrl-compass .mapboxgl-ctrl-icon{filter:invert(1) brightness(.7);}
+.mapboxgl-ctrl button:not(:disabled):hover{background:var(--navy3)!important;}
+.mapboxgl-ctrl-attrib{background:rgba(10,22,40,.85)!important;}
+.mapboxgl-ctrl-attrib a{color:var(--teal)!important;}
+.mapboxgl-ctrl-scale{background:rgba(10,22,40,.75)!important;border-color:var(--muted)!important;color:var(--muted)!important;font-size:.65rem!important;}
+
+/* ── FORECAST GRID — matches dashboard exactly ── */
+.forecast-grid{
+  display:grid;grid-template-columns:repeat(10,1fr);gap:8px;
+}
+@media(max-width:1100px){.forecast-grid{grid-template-columns:repeat(5,1fr);}}
+@media(max-width:600px) {.forecast-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:380px) {.forecast-grid{grid-template-columns:repeat(2,1fr);}}
+
+.forecast-day{
+  background:var(--card2);border:1px solid var(--border);border-radius:14px;
+  padding:12px 8px;text-align:center;transition:all .2s;position:relative;
+}
+.forecast-day:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3);}
+.forecast-day.today-fx{border-color:var(--gold);background:rgba(201,162,39,.08);}
+.forecast-day.best-day{border-color:var(--green);background:rgba(46,204,113,.06);}
+.forecast-day.perfect-day{
+  border-color:var(--green);background:rgba(46,204,113,.1);
+  box-shadow:0 0 16px rgba(46,204,113,.2);
+}
+.fx-day-name{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.fx-date{font-size:.6rem;color:var(--muted);margin-top:2px;}
+.fx-icon{font-size:1.6rem;margin:7px 0 5px;}
+.fx-wind{font-size:1rem;font-weight:800;margin:3px 0;}
+.fx-dir{font-size:.68rem;color:var(--muted);}
+.fx-gust{font-size:.62rem;color:var(--orange);margin-top:2px;}
+.sailing-rating{
+  margin-top:7px;padding:4px 5px;border-radius:8px;
+  font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+}
+.rating-stars{font-size:.72rem;margin-top:3px;}
+.best-badge{
+  position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+  background:var(--green);color:var(--navy);font-size:.58rem;font-weight:900;
+  padding:2px 8px;border-radius:20px;letter-spacing:.08em;white-space:nowrap;
+}
+.perfect-badge{background:var(--gold2);color:var(--navy);}
+
+/* Wind legend — matches dashboard */
+.wind-legend{
+  display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;
+  padding:10px 14px;background:var(--card2);border-radius:10px;
+}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+/* ── PIN CONTROLS ── */
+.map-pin-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.pin-btn{padding:7px 16px;border-radius:10px;border:2px solid transparent;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent;}
+.pin-btn.a{border-color:var(--teal);color:var(--teal);}
+.pin-btn.a:hover,.pin-btn.a.active{background:var(--teal);color:var(--navy);}
+.pin-btn.b{border-color:var(--gold);color:var(--gold);}
+.pin-btn.b:hover,.pin-btn.b.active{background:var(--gold);color:var(--navy);}
+
+/* ── COMPARE GRID ── */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:640px){.cmp-grid{grid-template-columns:1fr;}}
+.compare-slot{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:14px;transition:all .2s;}
+.compare-slot.slot-a{border-top:3px solid var(--teal);}
+.compare-slot.slot-b{border-top:3px solid var(--gold);}
+.cmp-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.cmp-pin-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.dot-a{background:var(--teal);}
+.dot-b{background:var(--gold);}
+.cmp-pin-label{font-size:.6rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+.cmp-loc{font-size:.84rem;font-weight:700;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cmp-coords{font-size:.63rem;color:var(--muted);margin-bottom:9px;}
+.cmp-empty{text-align:center;color:var(--muted);font-size:.82rem;padding:28px 10px;opacity:.7;}
+.cmp-verdict{font-size:.82rem;font-weight:800;text-align:center;padding:8px;border-radius:10px;margin-bottom:9px;}
+.cmp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px;}
+.cmp-stat{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:8px 5px;text-align:center;}
+.cmp-stat-lbl{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;}
+.cmp-stat-val{font-size:.9rem;font-weight:800;line-height:1.2;}
+.cmp-stat-chk{font-size:.62rem;color:var(--muted);}
+.cmp-forecast{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.cmp-forecast-lbl{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+.cmp-days{display:flex;flex-direction:column;gap:3px;}
+.cmp-day{display:grid;grid-template-columns:36px 20px 1fr auto;gap:5px;align-items:center;font-size:.72rem;padding:3px 4px;border-radius:5px;}
+.cmp-day-name{font-weight:700;color:var(--muted);font-size:.64rem;}
+.cmp-day-icon{font-size:.85rem;line-height:1;}
+.cmp-day-wind{color:var(--text);font-size:.71rem;}
+.cmp-day-rating{font-size:.68rem;font-weight:700;text-align:right;}
+
+/* ── REFRESH BUTTON ── */
+.refresh-btn{margin-left:auto;padding:6px 13px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.76rem;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.refresh-btn:hover{border-color:var(--teal);color:var(--teal);}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  header{padding:12px 16px;}
+  .hdr-logo{font-size:1.6rem;}
+  .hdr-name{font-size:1rem;}
+  #glMap{height:260px;}
+  .main{padding:14px 12px 60px;}
+  .pref-grid{grid-template-columns:1fr 1fr;}
+  .wstats{grid-template-columns:repeat(3,1fr);}
+  .wstat-val{font-size:1.1rem;}
+  .steps{gap:7px;}
+  .step{min-width:110px;}
+}
+@media(max-width:480px){
+  .hdr-badge{display:none;}
+  #glMap{height:230px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────── -->
+<header>
+  <div class="hdr-left">
+    <span class="hdr-logo">⛵</span>
+    <div>
+      <div class="hdr-name">Goldilocks</div>
+      <div class="hdr-sub">Sailing Conditions Finder · Tap the map · Get your verdict</div>
+    </div>
+  </div>
+  <div class="hdr-badge">
+    <div class="badge-lbl">Powered by</div>
+    <div class="badge-val">Open-Meteo · Mapbox</div>
+  </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────── -->
+<div class="main">
+
+  <!-- Description -->
+  <p style="font-size:.88rem;color:var(--muted);line-height:1.65;margin-bottom:18px;">
+    <strong style="color:var(--text);">Goldilocks</strong> is a free sailing conditions checker. Set your ideal wind speed, direction, and gust limits — then tap anywhere on the map to instantly see if conditions are in your sweet spot. Works for any sailing class, any location in the world.
+  </p>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step"><div class="snum">1</div><div class="stxt">Add your Mapbox token below — free at mapbox.com</div></div>
+    <div class="step"><div class="snum">2</div><div class="stxt">Set your ideal conditions or speak them with your voice</div></div>
+    <div class="step"><div class="snum">3</div><div class="stxt">Search for a venue or tap directly on the map</div></div>
+    <div class="step"><div class="snum">4</div><div class="stxt">Get your Goldilocks verdict instantly</div></div>
+  </div>
+
+  <!-- ── MAPBOX TOKEN BANNER ── -->
+  <div class="token-banner" id="tokenBanner">
+    <p><strong>Mapbox API token required.</strong> The interactive map needs a free Mapbox public token (<code>pk.</code>…). Get yours free at <a href="https://mapbox.com" target="_blank" rel="noopener" style="color:var(--teal);">mapbox.com</a> — no credit card required for the free tier.</p>
+    <div>
+      <div class="token-input-row">
+        <input class="token-input" id="tokenInput" type="text" placeholder="pk.eyJ1Ijoi…  Paste your Mapbox token">
+        <button class="token-save-btn" onclick="saveToken()">Save &amp; Load Map</button>
+      </div>
+      <div class="token-link" style="margin-top:6px;">Or go to <a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener">account.mapbox.com/access-tokens</a> → copy Default public token</div>
+    </div>
+  </div>
+
+  <!-- ── PREFERENCES ── -->
+  <p class="section-title">⚙️ Your Ideal Conditions</p>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon">🎯</span>
+      <h3>Set Your Goldilocks Zone</h3>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button id="voiceBtn" class="vbtn" onclick="startVoice()">🎤 Speak conditions</button>
+        <span id="vstatus" class="vstatus"></span>
+      </div>
+    </div>
+
+    <div id="vtranscript" class="vtranscript"></div>
+
+    <div class="pref-grid">
+      <div class="pitem">
+        <label>Min Wind (kts)</label>
+        <input type="number" id="windMin" value="8" min="0" max="60" oninput="updateConditionsText()">
+      </div>
+      <div class="pitem">
+        <label>Max Wind (kts)</label>
+        <input type="number" id="windMax" value="20" min="0" max="60" oninput="updateConditionsText()">
+      </div>
+      <div class="pitem">
+        <label>Preferred Direction</label>
+        <select id="windDir" onchange="updateConditionsText()">
+          <option value="any">Any Direction</option>
+          <option value="0">North (0°)</option>
+          <option value="45">Northeast (45°)</option>
+          <option value="90">East (90°)</option>
+          <option value="135">Southeast (135°)</option>
+          <option value="180">South (180°)</option>
+          <option value="225">Southwest (225°)</option>
+          <option value="270" selected>West (270°)</option>
+          <option value="315">Northwest (315°)</option>
+        </select>
+      </div>
+      <div class="pitem">
+        <label>Max Gusts (kts)</label>
+        <input type="number" id="maxGusts" value="28" min="0" max="80" oninput="updateConditionsText()">
+      </div>
+    </div>
+
+    <div class="tol-row">
+      <label>Direction tolerance:</label>
+      <input type="range" id="dirTol" min="10" max="90" step="5" value="45" oninput="updateTolLabel();updateConditionsText()">
+      <span class="tol-val" id="tolVal">±45°</span>
+    </div>
+
+    <!-- The 💡 conditions line — updates dynamically -->
+    <div class="info-box" id="ctextEl">
+      <span>💡 Ideal conditions:</span> 8–20 knots from the West (270°). Direction tolerance ±45°. Gusts under 28 kts. Data from Open-Meteo — free, no API key required, updates automatically.
+    </div>
+  </div>
+
+  <!-- ── MAP SECTION ── -->
+  <p class="section-title">🗺️ Interactive Sailing Map</p>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon">🌊</span>
+      <h3>Click-to-Forecast Map — Tap Anywhere to Check Conditions</h3>
+    </div>
+
+    <!-- Pin A / Pin B toggle — matches dashboard compare pattern -->
+    <div class="map-pin-controls">
+      <span style="font-size:.74rem;color:var(--muted);">Drop pin:</span>
+      <button id="pinBtnA" class="pin-btn a active" onclick="setActivePin('A')">📍 Pin A</button>
+      <button id="pinBtnB" class="pin-btn b" onclick="setActivePin('B')">📍 Pin B</button>
+      <span id="pinHint" style="font-size:.72rem;color:var(--muted);display:none;"></span>
+    </div>
+
+    <!-- Geocoder search — identical pattern to dashboard -->
+    <div class="map-search-bar">
+      <div id="geocoderMount" style="flex:1;min-width:0;">
+        <div id="geocoderFallback" style="display:flex;gap:10px;width:100%;">
+          <input class="weather-input" id="locationInput" placeholder="Search for a city, bay, or sailing venue…"
+            onkeydown="if(event.key==='Enter')searchFallback()">
+          <button class="search-btn" onclick="searchFallback()">🔍 Search</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-hint">Tap anywhere on the map to check live wind conditions at that spot</div>
+
+    <!-- Map container — matches dashboard #sailMap structure -->
+    <div id="glMap">
+      <div id="mapPlaceholder">
+        <span style="font-size:2.5rem;">🗺️</span>
+        <strong style="color:var(--text);">Add your Mapbox token to enable the map</strong>
+        <span style="font-size:.8rem;color:var(--muted);">Paste your <code style="color:var(--teal);">pk.</code> token in the banner above and click Save &amp; Load Map</span>
+      </div>
+    </div>
+
+    <!-- ── COMPARE GRID — Pin A vs Pin B ── -->
+    <div id="compareGrid" style="margin-top:16px;display:none;">
+      <div class="cmp-grid">
+        <div class="compare-slot slot-a" id="slotA">
+          <div class="cmp-empty">📍 Tap the map or search to set <strong style="color:var(--teal);">Pin A</strong></div>
+        </div>
+        <div class="compare-slot slot-b" id="slotB">
+          <div class="cmp-empty">📍 Tap the map or search to set <strong style="color:var(--gold);">Pin B</strong></div>
+        </div>
+      </div>
+      <button class="share-btn" onclick="shareConditions()">🔗 Share These Conditions</button>
+    </div>
+
+  </div><!-- end map card -->
+
+  <!-- ── 10-DAY FORECAST ── -->
+  <div id="forecastSection" style="display:none;">
+    <p class="section-title">📅 10-Day Wind Forecast — Rated Against Your Preferences</p>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-icon">🌊</span>
+        <h3 id="forecastTitle">10-Day Sailing Forecast</h3>
+        <button class="refresh-btn" onclick="refreshForecast()" title="Re-rate with current preferences">🔄 Re-rate</button>
+      </div>
+
+      <div id="forecastContainer">
+        <!-- Filled by renderForecast() -->
+      </div>
+
+      <!-- Legend — ratings are relative to YOUR preferences -->
+      <div class="wind-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--gold2);box-shadow:0 0 5px rgba(240,192,64,.5);"></div> Perfect — in your exact zone</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Great — close to zone</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--orange);"></div> Good / Trainable</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--red);"></div> Poor / Too gusty / No wind</div>
+      </div>
+
+      <div class="info-box" id="forecastInfoBox" style="margin-top:14px;">
+        <span>💡 Ratings are based on your preferences:</span> <span id="forecastPrefSummary"></span> Data from Open-Meteo — free, no API key required.
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<footer>
+  Wind data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — free, no API key required, updates automatically.<br>
+  Map by <a href="https://www.mapbox.com" target="_blank" rel="noopener">Mapbox</a> · Built for sailors. 🌊
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let mapInst = null;
+let geocoderInst = null;
+let prefs = { windMin:8, windMax:20, windDir:'270', maxGusts:28, dirTol:45 };
+
+// ── Pin A / B compare state ──
+let activePin = 'A';
+let markers      = { A: null, B: null };
+let pinLocations = { A: null, B: null };   // { lat, lng, name }
+let pinWeather   = { A: null, B: null };   // { speed, dir, gusts }
+let slotDailyData = { A: null, B: null };  // Open-Meteo daily object
+let lastForecastData = null;               // cached for refresh
+let lastForecastName = null;
+
+// ═══════════════════════════════════════════════
+//  TOKEN FLOW
+// ═══════════════════════════════════════════════
+function saveToken() {
+  const raw = document.getElementById('tokenInput').value.trim();
+  if (!raw.startsWith('pk.')) {
+    alert('That doesn\'t look like a valid Mapbox public token. It should start with pk.');
+    return;
+  }
+  localStorage.setItem('mapbox_key', raw);
+  document.getElementById('tokenBanner').style.display = 'none';
+  initMapAndGeocoder(raw);
+}
+
+function loadTokenOnBoot() {
+  const key = localStorage.getItem('mapbox_key') || '';
+  if (key.startsWith('pk.')) {
+    document.getElementById('tokenBanner').style.display = 'none';
+    initMapAndGeocoder(key);
+  }
+  // else banner stays visible
+}
+
+// ═══════════════════════════════════════════════
+//  PIN TOGGLE
+// ═══════════════════════════════════════════════
+function setActivePin(pin) {
+  activePin = pin;
+  document.getElementById('pinBtnA').classList.toggle('active', pin === 'A');
+  document.getElementById('pinBtnB').classList.toggle('active', pin === 'B');
+  const hint = document.getElementById('pinHint');
+  hint.style.display = 'inline';
+  hint.textContent = `Next click → Pin ${pin}`;
+  setTimeout(() => { hint.style.display = 'none'; }, 2500);
+}
+
+// ═══════════════════════════════════════════════
+//  MAP + GEOCODER INIT — mirrors dashboard pattern
+// ═══════════════════════════════════════════════
+function initMapAndGeocoder(key) {
+  mapboxgl.accessToken = key;
+
+  // Hide placeholder, init real map
+  const placeholder = document.getElementById('mapPlaceholder');
+  if (placeholder) placeholder.style.display = 'none';
+
+  mapInst = new mapboxgl.Map({
+    container: 'glMap',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: [0, 20],
+    zoom: 1.8
+  });
+
+  mapInst.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  mapInst.addControl(new mapboxgl.ScaleControl({ unit: 'nautical' }), 'bottom-left');
+
+  mapInst.on('click', e => {
+    checkConditions(e.lngLat.lat, e.lngLat.lng);
+  });
+
+  // Mount geocoder — identical to dashboard
+  initGeocoder(key);
+}
+
+function initGeocoder(key) {
+  if (geocoderInst) return;
+  const mount = document.getElementById('geocoderMount');
+  const fallback = document.getElementById('geocoderFallback');
+
+  try {
+    mapboxgl.accessToken = key;
+    geocoderInst = new MapboxGeocoder({
+      accessToken: key,
+      mapboxgl: mapboxgl,
+      placeholder: 'Search for a city, bay, or sailing venue…',
+      marker: false,
+      flyTo: { speed: 1.4, curve: 1.4 }
+    });
+    if (fallback) fallback.style.display = 'none';
+    geocoderInst.addTo(mount);
+
+    geocoderInst.on('result', e => {
+      const [lng, lat] = e.result.center;
+      const placeName  = e.result.place_name || '';
+      checkConditions(lat, lng, placeName);
+    });
+  } catch(err) {
+    // Keep fallback input if geocoder fails
+    if (fallback) fallback.style.display = 'flex';
+  }
+}
+
+// Fallback search when no geocoder
+async function searchFallback() {
+  const q = document.getElementById('locationInput').value.trim();
+  if (!q) return;
+  const btn = document.querySelector('.search-btn');
+  const orig = btn.textContent;
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const key = localStorage.getItem('mapbox_key') || '';
+    let lat, lng, placeName = '';
+    if (key.startsWith('pk.')) {
+      // Use Mapbox geocoding
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${key}&limit=1`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.features?.length) { alert('Location not found.'); return; }
+      [lng, lat] = data.features[0].center;
+      placeName = data.features[0].place_name || '';
+    } else {
+      // Fallback to Open-Meteo geocoding
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`);
+      const data = await res.json();
+      if (!data.results?.length) { alert('Location not found.'); return; }
+      lat = data.results[0].latitude;
+      lng = data.results[0].longitude;
+      placeName = data.results[0].name || q;
+    }
+    if (mapInst) mapInst.flyTo({ center: [lng, lat], zoom: 10, speed: 1.4 });
+    checkConditions(lat, lng, placeName || undefined);
+  } catch(e) {
+    alert('Search failed. Please try again.');
+  } finally {
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  CHECK CONDITIONS — pin-aware
+// ═══════════════════════════════════════════════
+async function checkConditions(lat, lng, knownName) {
+  const pin = activePin;
+  pinLocations[pin] = { lat, lng, name: knownName || null };
+
+  // Show compare grid, set loading state for this slot
+  const grid = document.getElementById('compareGrid');
+  grid.style.display = 'block';
+  const slotEl = document.getElementById('slot' + pin);
+  slotEl.innerHTML = `
+    <div class="cmp-header">
+      <div class="cmp-pin-dot dot-${pin.toLowerCase()}"></div>
+      <span class="cmp-pin-label">Pin ${pin}</span>
+    </div>
+    <div class="cmp-verdict" style="background:rgba(0,180,216,.07);color:var(--muted);">⏳ Fetching live wind data…</div>`;
+
+  // Drop colored marker for this pin (A = teal, B = gold)
+  if (mapInst) {
+    if (markers[pin]) markers[pin].remove();
+    const el = document.createElement('div');
+    const bgCol  = pin === 'A' ? '#00b4d8' : '#c9a227';
+    const shadow = pin === 'A' ? 'rgba(0,180,216,.45)' : 'rgba(201,162,39,.45)';
+    el.style.cssText = `width:20px;height:20px;border-radius:50%;background:${bgCol};border:3px solid #fff;box-shadow:0 0 0 3px ${shadow};cursor:pointer;`;
+    el.title = `Pin ${pin}`;
+    markers[pin] = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(mapInst);
+  }
+
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
+      `&current=windspeed_10m,winddirection_10m,windgusts_10m` +
+      `&wind_speed_unit=kn&timezone=auto&forecast_days=1`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const data = await res.json();
+    const c = data.current;
+
+    const speed = Math.round(c.windspeed_10m);
+    const dir   = Math.round(c.winddirection_10m);
+    const gusts = Math.round(c.windgusts_10m);
+
+    pinWeather[pin] = { speed, dir, gusts };
+
+    // Render slot immediately with coords as name (update after geocode)
+    const displayName = knownName || `${lat.toFixed(3)}°, ${lng.toFixed(3)}°`;
+    renderCompareSlot(pin, speed, dir, gusts, slotDailyData[pin], displayName, lat, lng);
+
+    if (knownName) {
+      // Name already known from geocoder — skip reverse geocode
+      pinLocations[pin].name = knownName;
+      loadForecastForPin(pin, lat, lng, knownName).catch(() => {});
+    } else {
+      // Reverse geocode then load forecast
+      reverseGeocode(lat, lng).then(name => {
+        pinLocations[pin].name = name;
+        renderCompareSlot(pin, speed, dir, gusts, slotDailyData[pin], name, lat, lng);
+        loadForecastForPin(pin, lat, lng, name).catch(() => {});
+      });
+    }
+
+  } catch(e) {
+    slotEl.innerHTML += `<div style="color:var(--red);font-size:.8rem;text-align:center;padding:12px;">❌ Could not fetch weather data. Check connection.</div>`;
+  }
+
+  grid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// (displayResults and renderHourly replaced by renderCompareSlot below)
+
+// ═══════════════════════════════════════════════
+//  REVERSE GEOCODE — returns name string
+// ═══════════════════════════════════════════════
+async function reverseGeocode(lat, lng) {
+  const key = localStorage.getItem('mapbox_key') || '';
+  let name = `${lat.toFixed(3)}°, ${lng.toFixed(3)}°`;
+  try {
+    if (key.startsWith('pk.')) {
+      const res  = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${key}&types=place,locality,region&limit=1`);
+      const data = await res.json();
+      if (data.features?.length) name = data.features[0].place_name;
+    } else {
+      const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+      const data = await res.json();
+      const a    = data.address || {};
+      const city = a.city || a.town || a.village || a.county || '';
+      const ctry = a.country || '';
+      if (city || ctry) name = [city, ctry].filter(Boolean).join(', ');
+    }
+  } catch(e) { /* use fallback coords */ }
+  return name;
+}
+
+// ═══════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════
+function dirDiff(a, b) {
+  let d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+function degToCompass(deg) {
+  const d = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return d[Math.round(deg / 22.5) % 16];
+}
+
+// ═══════════════════════════════════════════════
+//  FORECAST — 10-DAY
+// ═══════════════════════════════════════════════
+const WMO = {
+  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',
+  51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',
+  71:'❄️',73:'❄️',75:'❄️',77:'❄️',80:'🌦️',81:'🌦️',82:'⛈️',95:'⛈️'
+};
+const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Rate a single day against the user's current prefs
+function rateDay(spd, dir, gust) {
+  const dirOK  = prefs.windDir === 'any' || dirDiff(dir, parseInt(prefs.windDir)) <= prefs.dirTol;
+  const nearMin = Math.max(0, prefs.windMin * 0.75);
+  const nearMax = prefs.windMax * 1.3;
+
+  if (spd < 3)
+    return {stars:1, label:'No Wind',   color:'#667799', emoji:'😴', bg:'rgba(100,120,160,.08)'};
+  if (gust > prefs.maxGusts + 5)
+    return {stars:1, label:'Too Gusty', color:'#e74c3c', emoji:'⚠️', bg:'rgba(231,76,60,.1)'};
+  if (spd > prefs.maxGusts)
+    return {stars:2, label:'Heavy Air', color:'#e74c3c', emoji:'💨', bg:'rgba(231,76,60,.08)'};
+
+  // Perfect: in exact Goldilocks zone
+  if (spd >= prefs.windMin && spd <= prefs.windMax && dirOK && gust <= prefs.maxGusts)
+    return {stars:5, label:'PERFECT',   color:'#f0c040', emoji:'🔥', bg:'rgba(240,192,64,.1)'};
+
+  // Great: close to zone, right direction
+  if (spd >= nearMin && spd <= nearMax && dirOK)
+    return {stars:4, label:'Great',     color:'#2ecc71', emoji:'⭐', bg:'rgba(46,204,113,.08)'};
+
+  // Good: roughly in range
+  if (spd >= nearMin * 0.8 && spd <= nearMax * 1.1)
+    return {stars:3, label:'Good',      color:'#f39c12', emoji:'👍', bg:'rgba(243,156,18,.08)'};
+
+  // Trainable: any usable wind
+  if (spd >= 4)
+    return {stars:2, label:'Trainable', color:'#e67e22', emoji:'🌬️', bg:'rgba(230,126,34,.06)'};
+
+  return {stars:1, label:'Poor',        color:'#c0392b', emoji:'👎', bg:'rgba(192,57,43,.06)'};
+}
+
+// loadForecast — legacy wrapper used by fallback search
+async function loadForecast(lat, lng, locationName) {
+  await loadForecastForPin(activePin, lat, lng, locationName);
+}
+
+// loadForecastForPin — fetches daily data, caches, updates slot + big forecast
+async function loadForecastForPin(pin, lat, lng, locationName) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
+    `&daily=windspeed_10m_max,windgusts_10m_max,winddirection_10m_dominant,weathercode,precipitation_sum` +
+    `&wind_speed_unit=kn&timezone=auto&forecast_days=10`;
+
+  const res  = await fetch(url);
+  const data = await res.json();
+
+  // Cache daily data for this pin + global cache for refresh button
+  slotDailyData[pin] = data.daily;
+  lastForecastData   = data.daily;
+  lastForecastName   = locationName;
+
+  // Re-render slot with full 7-day mini-forecast
+  if (pinWeather[pin] && pinLocations[pin]) {
+    const { speed, dir, gusts } = pinWeather[pin];
+    const { lat: plat, lng: plng } = pinLocations[pin];
+    renderCompareSlot(pin, speed, dir, gusts, data.daily, locationName, plat, plng);
+  }
+
+  // Render big 10-day forecast card at bottom
+  renderForecast(data.daily, locationName);
+}
+
+function renderForecast(d, locationName) {
+  // Cache for re-rate refresh
+  lastForecastData = d;
+  lastForecastName = locationName;
+
+  const section = document.getElementById('forecastSection');
+  section.style.display = 'block';
+
+  // Title
+  const title = document.getElementById('forecastTitle');
+  title.textContent = locationName
+    ? `10-Day Sailing Forecast — ${locationName}`
+    : '10-Day Sailing Forecast';
+
+  // Prefs summary in info-box
+  const dirLabel = prefs.windDir === 'any'
+    ? 'any direction'
+    : document.getElementById('windDir').selectedOptions[0].text;
+  document.getElementById('forecastPrefSummary').textContent =
+    `${prefs.windMin}–${prefs.windMax} kts from the ${dirLabel}, gusts under ${prefs.maxGusts} kts.`;
+
+  // Build cards
+  let html = '<div class="forecast-grid">';
+  for (let i = 0; i < d.time.length; i++) {
+    const dt     = new Date(d.time[i] + 'T12:00:00');
+    const isToday = i === 0;
+    const spd    = Math.round(d.windspeed_10m_max[i]);
+    const gust   = Math.round(d.windgusts_10m_max[i]);
+    const dir    = d.winddirection_10m_dominant[i];
+    const r      = rateDay(spd, dir, gust);
+    const icon   = WMO[d.weathercode[i]] || '🌤️';
+    const stars  = '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
+    const dayLbl = isToday ? 'TODAY' : DAYS[dt.getDay()];
+    const dateLbl = `${MONTHS[dt.getMonth()]} ${dt.getDate()}`;
+
+    let cls   = 'forecast-day' + (isToday ? ' today-fx' : '');
+    let badge = '';
+    if (r.stars === 5) { cls += ' perfect-day'; badge = '<span class="best-badge perfect-badge">PERFECT</span>'; }
+    else if (r.stars === 4) { cls += ' best-day'; badge = '<span class="best-badge">GREAT</span>'; }
+
+    html += `<div class="${cls}" style="background-color:${r.bg};">
+      ${badge}
+      <div class="fx-day-name">${dayLbl}</div>
+      <div class="fx-date">${dateLbl}</div>
+      <div class="fx-icon">${icon}</div>
+      <div class="fx-wind" style="color:${r.color}">${spd} kt</div>
+      <div class="fx-dir">${degToCompass(dir)} (${Math.round(dir)}°)</div>
+      <div class="fx-gust">Gusts ${gust}kt</div>
+      <div class="sailing-rating" style="background:${r.bg};color:${r.color};">${r.emoji} ${r.label}</div>
+      <div class="rating-stars" style="color:${r.color}">${stars}</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  document.getElementById('forecastContainer').innerHTML = html;
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER COMPARE SLOT — fills Pin A or Pin B card
+// ═══════════════════════════════════════════════
+function renderCompareSlot(pin, speed, dir, gusts, daily, name, lat, lng) {
+  const slotEl  = document.getElementById('slot' + pin);
+  const dirVal  = prefs.windDir;
+  const speedOK = speed >= prefs.windMin && speed <= prefs.windMax;
+  const gustOK  = gusts <= prefs.maxGusts;
+  const dirOK   = dirVal === 'any' || dirDiff(dir, parseInt(dirVal)) <= prefs.dirTol;
+  const score   = [speedOK, gustOK, dirOK].filter(Boolean).length;
+  const compass = degToCompass(dir);
+
+  const verdicts = [
+    { cls:'v-nope',     icon:'🔴', text:'Not Today' },
+    { cls:'v-close',    icon:'🟠', text:'Not Quite' },
+    { cls:'v-marginal', icon:'🟡', text:'Getting There' },
+    { cls:'v-perfect',  icon:'🟢', text:'Just Right!' }
+  ];
+  const v = verdicts[score];
+
+  // Compact 7-day mini-forecast rows
+  let forecastHtml = '';
+  if (daily && daily.time && daily.time.length) {
+    const count = Math.min(daily.time.length, 7);
+    let rows = '';
+    for (let i = 0; i < count; i++) {
+      const dt   = new Date(daily.time[i] + 'T12:00:00');
+      const spd  = Math.round(daily.windspeed_10m_max[i]);
+      const gust = Math.round(daily.windgusts_10m_max[i]);
+      const wdir = daily.winddirection_10m_dominant[i];
+      const r    = rateDay(spd, wdir, gust);
+      const icon = WMO[daily.weathercode[i]] || '🌤️';
+      const dayLbl = i === 0 ? 'Today' : DAYS[dt.getDay()];
+      rows += `<div class="cmp-day" style="background:${r.bg};">
+        <span class="cmp-day-name">${dayLbl}</span>
+        <span class="cmp-day-icon">${icon}</span>
+        <span class="cmp-day-wind">${spd}kt ${degToCompass(wdir)}</span>
+        <span class="cmp-day-rating" style="color:${r.color};">${r.emoji} ${r.label}</span>
+      </div>`;
+    }
+    forecastHtml = `<div class="cmp-forecast">
+      <div class="cmp-forecast-lbl">7-Day Outlook</div>
+      <div class="cmp-days">${rows}</div>
+    </div>`;
+  }
+
+  slotEl.innerHTML = `
+    <div class="cmp-header">
+      <div class="cmp-pin-dot dot-${pin.toLowerCase()}"></div>
+      <span class="cmp-pin-label">Pin ${pin}</span>
+      <span class="cmp-loc" title="${name}">${name}</span>
+    </div>
+    <div class="cmp-coords">📍 ${lat.toFixed(3)}°, ${lng.toFixed(3)}°</div>
+    <div class="cmp-verdict ${v.cls}">${v.icon} ${v.text}</div>
+    <div class="cmp-stats">
+      <div class="cmp-stat">
+        <div class="cmp-stat-lbl">Wind</div>
+        <div class="cmp-stat-val" style="color:${speedOK ? 'var(--green)' : 'var(--red)'};">${speed}kt</div>
+        <div class="cmp-stat-chk">${speedOK ? '✅ In zone' : speed < prefs.windMin ? '⬇️ Light' : '⬆️ Strong'}</div>
+      </div>
+      <div class="cmp-stat">
+        <div class="cmp-stat-lbl">Direction</div>
+        <div class="cmp-stat-val" style="color:${dirOK ? 'var(--green)' : 'var(--orange)'};">${compass}</div>
+        <div class="cmp-stat-chk">${dirOK ? '✅ On angle' : '❌ Off angle'}</div>
+      </div>
+      <div class="cmp-stat">
+        <div class="cmp-stat-lbl">Gusts</div>
+        <div class="cmp-stat-val" style="color:${gustOK ? 'var(--green)' : 'var(--orange)'};">${gusts}kt</div>
+        <div class="cmp-stat-chk">${gustOK ? '✅ OK' : '⚠️ High'}</div>
+      </div>
+    </div>
+    ${forecastHtml}`;
+}
+
+// ═══════════════════════════════════════════════
+//  REFRESH FORECAST — re-rates with updated prefs
+// ═══════════════════════════════════════════════
+function refreshForecast() {
+  // Re-render big 10-day forecast card
+  if (lastForecastData) {
+    renderForecast(lastForecastData, lastForecastName);
+  }
+  // Re-render both compare slots
+  ['A', 'B'].forEach(pin => {
+    if (pinWeather[pin] && pinLocations[pin]) {
+      const { speed, dir, gusts } = pinWeather[pin];
+      const { lat, lng, name }    = pinLocations[pin];
+      renderCompareSlot(pin, speed, dir, gusts, slotDailyData[pin], name || `${lat.toFixed(3)}°, ${lng.toFixed(3)}°`, lat, lng);
+    }
+  });
+  // Visual feedback
+  const btn = document.querySelector('.refresh-btn');
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = '✅ Re-rated!';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 1800);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  CONDITIONS TEXT — updates the 💡 line dynamically
+// ═══════════════════════════════════════════════
+function updateConditionsText() {
+  const min  = parseInt(document.getElementById('windMin').value)  || 0;
+  const max  = parseInt(document.getElementById('windMax').value)  || 0;
+  const dir  = document.getElementById('windDir').value;
+  const gust = parseInt(document.getElementById('maxGusts').value) || 0;
+  const tol  = parseInt(document.getElementById('dirTol').value)   || 45;
+
+  prefs = { windMin:min, windMax:max, windDir:dir, maxGusts:gust, dirTol:tol };
+
+  const dirLabel = dir === 'any'
+    ? 'any direction'
+    : document.getElementById('windDir').selectedOptions[0].text;
+
+  const tolTxt = dir === 'any' ? '' : ` Direction tolerance ±${tol}°.`;
+
+  document.getElementById('ctextEl').innerHTML =
+    `<span>💡 Ideal conditions:</span> ${min}–${max} knots from the ${dirLabel}.${tolTxt} Gusts under ${gust} kts. Data from Open-Meteo — free, no API key required, updates automatically.`;
+
+  localStorage.setItem('glPrefs', JSON.stringify(prefs));
+}
+
+function updateTolLabel() {
+  document.getElementById('tolVal').textContent = `±${document.getElementById('dirTol').value}°`;
+}
+
+// ═══════════════════════════════════════════════
+//  VOICE — SPEECH TO TEXT
+// ═══════════════════════════════════════════════
+let recog;
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Speech recognition requires Chrome on Android or Desktop. Use the manual inputs instead.'); return; }
+  if (recog) { try { recog.stop(); } catch(e) {} return; }
+
+  recog = new SR();
+  recog.lang = 'en-US';
+  recog.continuous = false;
+  recog.interimResults = false;
+
+  const btn = document.getElementById('voiceBtn');
+  btn.classList.add('on');
+  btn.textContent = '🔴 Listening…';
+  document.getElementById('vstatus').textContent = 'Say: "8 to 18 knots from the southwest, gusts under 25"';
+  document.getElementById('vtranscript').textContent = '';
+
+  recog.onresult = e => {
+    const txt = e.results[0][0].transcript;
+    document.getElementById('vtranscript').textContent = `"${txt}"`;
+    parseVoice(txt);
+  };
+
+  recog.onend = () => {
+    recog = null;
+    btn.classList.remove('on');
+    btn.textContent = '🎤 Speak conditions';
+    document.getElementById('vstatus').textContent = '';
+  };
+
+  recog.onerror = err => {
+    recog = null;
+    btn.classList.remove('on');
+    btn.textContent = '🎤 Speak conditions';
+    document.getElementById('vstatus').textContent = err.error === 'not-allowed' ? '⚠️ Mic permission denied' : '⚠️ Error — try again';
+  };
+
+  recog.start();
+}
+
+// ═══════════════════════════════════════════════
+//  PARSE VOICE → FILL PREFERENCES
+// ═══════════════════════════════════════════════
+function parseVoice(raw) {
+  const t = ' ' + raw.toLowerCase() + ' ';
+
+  // Wind range: "10 to 20 knots" / "between 8 and 18"
+  const range = t.match(/(\d+)\s*(?:to|and|through|up to|-)\s*(\d+)\s*(?:knots?|kts?|kt)?/);
+  if (range) {
+    document.getElementById('windMin').value = Math.min(range[1], range[2]);
+    document.getElementById('windMax').value = Math.max(range[1], range[2]);
+  } else {
+    const single = t.match(/(?:about|around|roughly|at)?\s*(\d+)\s*(?:knots?|kts?|kt)/);
+    if (single) {
+      const v = parseInt(single[1]);
+      document.getElementById('windMin').value = Math.max(0, v - 5);
+      document.getElementById('windMax').value = v + 5;
+    }
+  }
+
+  // Direction — compound before cardinal
+  const dirs = [
+    { w:['north east','northeast',' nne ',' ene '], v:'45'  },
+    { w:['south east','southeast',' sse ',' ese '], v:'135' },
+    { w:['south west','southwest',' ssw ',' wsw '], v:'225' },
+    { w:['north west','northwest',' nnw ',' wnw '], v:'315' },
+    { w:['north'],  v:'0'   },
+    { w:['east'],   v:'90'  },
+    { w:['south'],  v:'180' },
+    { w:['west'],   v:'270' },
+  ];
+  for (const d of dirs) {
+    if (d.w.some(w => t.includes(w))) {
+      document.getElementById('windDir').value = d.v;
+      break;
+    }
+  }
+
+  // Gusts
+  const gust = t.match(/gusts?\s*(?:under|below|less\s*than|max(?:imum)?\s*(?:of)?|of)?\s*(\d+)/);
+  if (gust) document.getElementById('maxGusts').value = gust[1];
+
+  updateConditionsText();
+}
+
+// ═══════════════════════════════════════════════
+//  SHARE
+// ═══════════════════════════════════════════════
+function shareConditions() {
+  const base = (location.origin !== 'null' ? location.origin : '') + location.pathname;
+  const url  = `${base}#min=${prefs.windMin}&max=${prefs.windMax}&dir=${prefs.windDir}&gusts=${prefs.maxGusts}&tol=${prefs.dirTol}`;
+  const btn  = document.querySelector('.share-btn');
+
+  if (navigator.share) {
+    navigator.share({ title:'Goldilocks Sailing Conditions', url }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      btn.textContent = '✅ Link copied to clipboard!';
+      setTimeout(() => btn.textContent = '🔗 Share These Conditions', 2500);
+    }).catch(() => prompt('Copy this link:', url));
+  } else {
+    prompt('Copy this link:', url);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  LOAD SAVED STATE
+// ═══════════════════════════════════════════════
+function loadState() {
+  // URL hash takes priority (shared links)
+  const hash = location.hash.slice(1);
+  if (hash) {
+    const p = Object.fromEntries(hash.split('&').map(s => s.split('=')));
+    if (p.min)   document.getElementById('windMin').value   = p.min;
+    if (p.max)   document.getElementById('windMax').value   = p.max;
+    if (p.dir)   document.getElementById('windDir').value   = p.dir;
+    if (p.gusts) document.getElementById('maxGusts').value  = p.gusts;
+    if (p.tol)   { document.getElementById('dirTol').value  = p.tol; updateTolLabel(); }
+  } else {
+    try {
+      const s = JSON.parse(localStorage.getItem('glPrefs'));
+      if (s) {
+        if (s.windMin  != null) document.getElementById('windMin').value  = s.windMin;
+        if (s.windMax  != null) document.getElementById('windMax').value  = s.windMax;
+        if (s.windDir  != null) document.getElementById('windDir').value  = s.windDir;
+        if (s.maxGusts != null) document.getElementById('maxGusts').value = s.maxGusts;
+        if (s.dirTol   != null) { document.getElementById('dirTol').value = s.dirTol; updateTolLabel(); }
+      }
+    } catch(e) {}
+  }
+  updateConditionsText();
+}
+
+// ═══════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  loadTokenOnBoot();
+});
+</script>
+
+</body>
+</html>
